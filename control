@@ -1,0 +1,10 @@
+Package: net.3bod.8ball
+Name: 8ballHack
+Depends: mobilesubstrate
+Version: 1.0
+Architecture: iphoneos-arm
+Description: هاك لعبة 8ball
+Maintainer: @3bod_syr
+Author: @3bod_syr
+Section: Tweaks
+Conflicts: com.3bod.8ballhack
