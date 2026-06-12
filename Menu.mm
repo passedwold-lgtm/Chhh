@@ -612,7 +612,7 @@ static UIScrollView *gTabSV[3];
 - (void)addButton:(NSString *)btnName 
            action:(void (^)(void))actionBlock 
               tab:(FLTab)tab {
-    ActionButton *btn = [[ActionButton alloc] initButtonNamed:btnName colWidth:(gMenuWidth/3.0f) action:actionBlock];
+        ActionButton *btn = [[ActionButton alloc] initButtonNamed:btnName colWidth:(gMenuWidth/3.0f) action:actionBlock];
     [menu addSwitchToMenu:btn tab:tab];
 }
 
