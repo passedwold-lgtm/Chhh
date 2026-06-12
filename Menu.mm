@@ -108,7 +108,9 @@ Switches *switches = [[Switches alloc] init];
     _titleLabel.text      = @"FLUORITE";
     _titleLabel.textColor = FL_TEXT_PRIMARY;
     _titleLabel.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
-    _titleLabel.letterSpacing = 2.0f;
+      NSMutableAttributedString *attributed = [[NSMutableAttributedString alloc] initWithString:_titleLabel.text ?: @""];
+[attributed addAttribute:NSKernAttributeName value:@(2.0f) range:NSMakeRange(0, attributed.length)];
+_titleLabel.attributedText = attributed;
     [header addSubview:_titleLabel];
 
     // Tab Bar (Center of header)
