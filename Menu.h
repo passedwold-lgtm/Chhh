@@ -14,14 +14,13 @@
 @class SliderSwitch;
 @class Switches;
 
-// ── Tab identifiers ──────────────────────────────────────────
 typedef NS_ENUM(NSInteger, FLTab) {
     FLTabVisualization = 0,
     FLTabAutomation    = 1,
     FLTabSettings      = 2,
 };
 
-// ── Main menu window ─────────────────────────────────────────
+// ── Main menu ─────────────────────────────────────────────────
 @interface Menu : UIView
 
 - (id)initWithTitle:(NSString *)title_
@@ -40,18 +39,18 @@ typedef NS_ENUM(NSInteger, FLTab) {
          menuButton:(NSString *)menuButtonBase64_;
 
 - (void)showMenuButton;
+- (void)addSwitchToMenu:(id)switch_;
 - (void)addSwitchToMenu:(id)switch_ tab:(FLTab)tab;
-- (void)addSwitchToMenu:(id)switch_;          // default → Visualization tab
 - (void)showPopup:(NSString *)title_ description:(NSString *)description_;
 
 @end
 
-// ── Toggle row (base class) ───────────────────────────────────
+// ── Toggle row ────────────────────────────────────────────────
 @interface OffsetSwitch : UIView {
+@public
     NSString *preferencesKey;
     NSString *switchDescription;
     UILabel  *switchLabel;
-    UISwitch *toggleSwitch;
 }
 
 - (id)initHackNamed:(NSString *)hackName_
@@ -59,6 +58,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
             offsets:(std::vector<uint64_t>)offsets_
               bytes:(std::vector<std::string>)bytes_;
 
+- (void)restoreState:(BOOL)on;
 - (void)showInfo;
 - (NSString *)getPreferencesKey;
 - (NSString *)getDescription;
@@ -90,15 +90,11 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 @end
 
-// ── Public switch-builder ─────────────────────────────────────
+// ── Switch builder ────────────────────────────────────────────
 @interface Switches : NSObject
 
-- (void)addSwitch:(NSString *)hackName_
-      description:(NSString *)description_;
-
-- (void)addSwitch:(NSString *)hackName_
-      description:(NSString *)description_
-              tab:(FLTab)tab;
+- (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_;
+- (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab;
 
 - (void)addOffsetSwitch:(NSString *)hackName_
             description:(NSString *)description_
@@ -126,6 +122,6 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 @end
 
-// ── Globals (defined in Menu.mm) ──────────────────────────────
-extern Menu    *menu;
+// ── Globals ───────────────────────────────────────────────────
+extern Menu     *menu;
 extern Switches *switches;
