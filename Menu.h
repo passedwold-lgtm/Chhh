@@ -1,5 +1,5 @@
 //
-//  Menu.h  — FLUORITE-style UI
+//  Menu.h  — FLUORITE-style UI (3-column layout)
 //
 
 #import <UIKit/UIKit.h>
@@ -42,6 +42,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
 - (void)showMenuButton;
 - (void)addSwitchToMenu:(id)switch_;
 - (void)addSwitchToMenu:(id)switch_ tab:(FLTab)tab;
+- (void)addSwitchToMenu:(id)switch_ tab:(FLTab)tab col:(int)col;
 - (void)showPopup:(NSString *)title_ description:(NSString *)description_;
 
 @end
@@ -92,7 +93,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 @end
 
-// ── Action Button row ────────────────────────────────────────
+// ── Action Button row ─────────────────────────────────────────
 @interface ActionButton : UIView
 
 - (id)initButtonNamed:(NSString *)btnName
@@ -108,6 +109,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_;
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab;
+- (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab col:(int)col;
 
 - (void)addOffsetSwitch:(NSString *)hackName_
             description:(NSString *)description_
