@@ -2,7 +2,7 @@
 //  Menu.h  — FLUORITE-style UI
 //
 
-#import "UIKit/UIKit.h"
+#import <UIKit/UIKit.h>
 #import "KittyMemory/MemoryPatch.hpp"
 #import "SCLAlertView/SCLAlertView.h"
 
@@ -13,6 +13,7 @@
 @class TextFieldSwitch;
 @class SliderSwitch;
 @class Switches;
+@class ActionButton;
 
 typedef NS_ENUM(NSInteger, FLTab) {
     FLTabVisualization = 0,
@@ -68,6 +69,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 // ── Text-field row ────────────────────────────────────────────
 @interface TextFieldSwitch : OffsetSwitch <UITextFieldDelegate> {
+@public
     NSString *switchValueKey;
 }
 
@@ -90,8 +92,19 @@ typedef NS_ENUM(NSInteger, FLTab) {
 
 @end
 
+// ── Action Button row ────────────────────────────────────────
+@interface ActionButton : UIView
+
+- (id)initButtonNamed:(NSString *)btnName
+             colWidth:(CGFloat)colWidth
+          actionBlock:(void (^)(void))actionBlock;
+
+@end
+
 // ── Switch builder ────────────────────────────────────────────
 @interface Switches : NSObject
+
+- (void)setupFluoriteLayout; // แก้ Error "no visible @interface ... declares setupFluoriteLayout"
 
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_;
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab;
@@ -116,6 +129,10 @@ typedef NS_ENUM(NSInteger, FLTab) {
            minimumValue:(float)minimumValue_
            maximumValue:(float)maximumValue_
             sliderColor:(UIColor *)sliderColor_;
+
+- (void)addButton:(NSString *)btnName
+           action:(void (^)(void))actionBlock
+              tab:(FLTab)tab;
 
 - (NSString *)getValueFromSwitch:(NSString *)name;
 - (bool)isSwitchOn:(NSString *)switchName;
