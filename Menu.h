@@ -104,7 +104,7 @@ typedef NS_ENUM(NSInteger, FLTab) {
 // ── Switch builder ────────────────────────────────────────────
 @interface Switches : NSObject
 
-- (void)setupFluoriteLayout; // แก้ Error "no visible @interface ... declares setupFluoriteLayout"
+- (void)setupFluoriteLayout;
 
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_;
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab;
