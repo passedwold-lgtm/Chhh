@@ -155,7 +155,7 @@ Switches *switches = [[Switches alloc] init];
   // Close button
   UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
   close.frame = CGRectMake(cw-52, 0, 52, hh);
-  [close setTitle:@“✕” forState:UIControlStateNormal];
+  [close setTitle:@“X” forState:UIControlStateNormal];
   close.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightMedium];
   [close setTitleColor:FL_TEXT_SEC forState:UIControlStateNormal];
   [close addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
