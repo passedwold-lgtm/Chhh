@@ -209,8 +209,8 @@ Switches *switches = [[Switches alloc] init];
     for (int i = 0; i < 3; i++) {
         UIButton *tb = _tabButtons[i];
         BOOL active  = (i == _activeTab);
-        [tb setTitleColor:active  FL_TEXT_PRIMARY : FL_TEXT_SEC forState:UIControlStateNormal];
-        tb.backgroundColor    = active  FL_TAB_ACTIVE : [UIColor clearColor];
+        [tb setTitleColor:(active ? FL_TEXT_PRIMARY : FL_TEXT_SEC) forState:UIControlStateNormal];
+        tb.backgroundColor    = active ? FL_TAB_ACTIVE : [UIColor clearColor];
         tb.layer.cornerRadius = 20.0f;
     }
 }
@@ -231,7 +231,7 @@ Switches *switches = [[Switches alloc] init];
     for (id r in rows) rowY += [(UIView*)r frame].size.height;
 
     UIView *row = (UIView *)switch_;
-    row.frame = CGRectMake(0, rowY, gColWidths[col], row.frame.size.height : FL_ROW_H);
+    row.frame = CGRectMake(0, rowY, gColWidths[col], (row.frame.size.height > 0 ? row.frame.size.height : FL_ROW_H));
     [rows addObject:switch_];
 
     UIScrollView *sv = gColSV[tab][col];
@@ -378,7 +378,7 @@ Switches *switches = [[Switches alloc] init];
     BOOL on = sender.isOn;
     [defaults setBool:on forKey:preferencesKey];
     for (auto &p : memoryPatches)
-        on  p.Modify() : p.Restore();
+        on ? p.Modify() : p.Restore();
 }
 
 - (NSString *)getPreferencesKey { return preferencesKey; }
