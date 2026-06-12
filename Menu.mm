@@ -1,20 +1,19 @@
 #import <Foundation/Foundation.h>
 #import "Menu.h"
 
-// ── COLOURS ──────────────────────────────────────────────────
-#define FL_BG           [UIColor colorWithRed:0.10f green:0.10f blue:0.12f alpha:0.97f]
-#define FL_PANEL        [UIColor colorWithRed:0.14f green:0.14f blue:0.17f alpha:1.0f]
-#define FL_HEADER_BG    [UIColor colorWithRed:0.10f green:0.10f blue:0.12f alpha:1.0f]
-#define FL_TAB_ACTIVE   [UIColor colorWithRed:0.55f green:0.25f blue:0.90f alpha:1.0f]
+// ── COLOURS (Fluorite Theme) ─────────────────────────────────
+#define FL_BG           [UIColor colorWithRed:0.04f green:0.04f blue:0.06f alpha:0.99f]
+#define FL_PANEL        [UIColor colorWithRed:0.09f green:0.09f blue:0.13f alpha:1.0f]
+#define FL_TAB_ACTIVE   [UIColor colorWithRed:0.60f green:0.33f blue:0.90f alpha:1.0f]
 #define FL_TEXT_PRIMARY [UIColor whiteColor]
 #define FL_TEXT_SEC     [UIColor colorWithWhite:0.65f alpha:1.0f]
-#define FL_DIVIDER      [UIColor colorWithWhite:0.25f alpha:1.0f]
-#define FL_CORNER       16.0f
+#define FL_DIVIDER      [UIColor colorWithWhite:1.0f alpha:0.05f]
+#define FL_CORNER       24.0f
 #define FL_ROW_H        52.0f
 
 // ── GLOBALS ───────────────────────────────────────────────────
 static NSUserDefaults *defaults;
-static CGFloat         gMenuWidth  = 700.0f;
+static CGFloat         gMenuWidth  = 750.0f;
 static NSString       *gSwitchFont;
 static UIColor        *gSwitchColor;
 static UIButton       *gMenuButton;
@@ -22,21 +21,13 @@ static UIWindow       *gMainWindow;
 
 // per-tab row arrays (0=Vis, 1=Auto, 2=Settings)
 static NSMutableArray *gTabRows[3];
-
-Menu     *menu     = nil;
-Switches *switches = nil;
-
-__attribute__((constructor))
-static void initialize_menu() {
-    menu = [[Menu alloc] init];
-    switches = [[Switches alloc] init];
-}
-
-// ── IVAR STORAGE for array (C array can't be @property) ──────
 static UIScrollView *gTabSV[3];
 
+Menu     *menu     = [[Menu alloc] init];
+Switches *switches = [[Switches alloc] init];
+
 // ═══════════════════════════════════════════════════════════════
-//  MENU
+//  MENU IMPLEMENTATION
 // ═══════════════════════════════════════════════════════════════
 @interface Menu ()
 @property (strong, nonatomic) UIView       *containerView;
@@ -78,13 +69,13 @@ static UIScrollView *gTabSV[3];
     self.layer.opacity   = 0.0f;
     [gMainWindow addSubview:self];
 
-    // dim overlay
+    // Dim overlay
     UIView *dim = [[UIView alloc] initWithFrame:self.bounds];
     dim.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55f];
     [self addSubview:dim];
 
-    // card
-    CGFloat cw = gMenuWidth, ch = 420.0f;
+    // Card Container
+    CGFloat cw = gMenuWidth, ch = 480.0f;
     _containerView = [[UIView alloc] initWithFrame:CGRectMake(
         (self.bounds.size.width - cw)/2,
         (self.bounds.size.height - ch)/2,
@@ -92,68 +83,71 @@ static UIScrollView *gTabSV[3];
     _containerView.backgroundColor      = FL_BG;
     _containerView.layer.cornerRadius   = FL_CORNER;
     _containerView.layer.masksToBounds  = YES;
+    _containerView.layer.borderWidth    = 1.0f;
+    _containerView.layer.borderColor    = FL_DIVIDER.CGColor;
     [self addSubview:_containerView];
 
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handlePan:)];
     [_containerView addGestureRecognizer:pan];
 
-    // header
-    CGFloat hh = 56.0f;
+    // Header
+    CGFloat hh = 70.0f;
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0,0,cw,hh)];
-    header.backgroundColor = FL_HEADER_BG;
+    header.backgroundColor = [UIColor clearColor];
     [_containerView addSubview:header];
 
-    UILabel *gem = [[UILabel alloc] initWithFrame:CGRectMake(16,0,32,hh)];
-    gem.text      = @"✦";
+    // Fluorite Crystal Logo (Simulated shape via text)
+    UILabel *gem = [[UILabel alloc] initWithFrame:CGRectMake(24,0,32,hh)];
+    gem.text      = @"❖";
     gem.textColor = FL_TAB_ACTIVE;
-    gem.font      = [UIFont boldSystemFontOfSize:20];
+    gem.font      = [UIFont systemFontOfSize:26 weight:UIFontWeightMedium];
     [header addSubview:gem];
 
-    _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(52,0,cw-100,hh)];
-    _titleLabel.text      = title_;
+    _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(60,0,150,hh)];
+    _titleLabel.text      = @"FLUORITE";
     _titleLabel.textColor = FL_TEXT_PRIMARY;
-    _titleLabel.font      = [UIFont boldSystemFontOfSize:17];
+    _titleLabel.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
+    _titleLabel.letterSpacing = 2.0f;
     [header addSubview:_titleLabel];
 
-    UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
-    close.frame = CGRectMake(cw-44, 0, 44, hh);
-    [close setTitle:@"✕" forState:UIControlStateNormal];
-    close.titleLabel.font = [UIFont systemFontOfSize:17];
-    [close setTitleColor:FL_TEXT_SEC forState:UIControlStateNormal];
-    [close addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
-    [header addSubview:close];
+    // Tab Bar (Center of header)
+    CGFloat tabW = 320.0f, tabH = 40.0f;
+    UIView *tabContainer = [[UIView alloc] initWithFrame:CGRectMake((cw - tabW)/2, (hh - tabH)/2, tabW, tabH)];
+    tabContainer.backgroundColor = FL_PANEL;
+    tabContainer.layer.cornerRadius = 20.0f;
+    [header addSubview:tabContainer];
 
-    UIView *hdiv = [[UIView alloc] initWithFrame:CGRectMake(0,hh-0.5f,cw,0.5f)];
-    hdiv.backgroundColor = FL_DIVIDER;
-    [_containerView addSubview:hdiv];
-
-    // tab bar
-    CGFloat tabY = hh, tabH = 44.0f, tabW = cw/3.0f;
     NSArray *tabNames = @[@"Visualization", @"Automation", @"Settings"];
     NSMutableArray *tabBtns = [NSMutableArray new];
+    CGFloat singleTabW = tabW / 3.0f;
     for (int i = 0; i < 3; i++) {
         UIButton *tb = [UIButton buttonWithType:UIButtonTypeSystem];
-        tb.frame = CGRectMake(i*tabW, tabY, tabW, tabH);
+        tb.frame = CGRectMake(i*singleTabW, 0, singleTabW, tabH);
         tb.tag   = i;
         [tb setTitle:tabNames[i] forState:UIControlStateNormal];
         tb.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
         [tb addTarget:self action:@selector(tabTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [_containerView addSubview:tb];
+        [tabContainer addSubview:tb];
         [tabBtns addObject:tb];
     }
     _tabButtons = [tabBtns copy];
 
-    UIView *tabLine = [[UIView alloc] initWithFrame:CGRectMake(0, tabY+tabH-0.5f, cw, 0.5f)];
-    tabLine.backgroundColor = FL_DIVIDER;
-    [_containerView addSubview:tabLine];
+    // Close Button
+    UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
+    close.frame = CGRectMake(cw-60, 0, 60, hh);
+    [close setTitle:@"✕" forState:UIControlStateNormal];
+    close.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
+    [close setTitleColor:FL_TEXT_SEC forState:UIControlStateNormal];
+    [close addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
+    [header addSubview:close];
 
-    // scroll views — stored in static C array (avoids @property array issue)
-    CGFloat svY = tabY+tabH, svH = ch-svY;
+    // Scroll Views
+    CGFloat svY = hh, svH = ch-svY;
     for (int i = 0; i < 3; i++) {
         UIScrollView *sv = [[UIScrollView alloc] initWithFrame:CGRectMake(0,svY,cw,svH)];
         sv.backgroundColor = [UIColor clearColor];
-        sv.showsVerticalScrollIndicator = YES;
+        sv.showsVerticalScrollIndicator = NO;
         sv.hidden = (i != 0);
         gTabSV[i] = sv;
         [_containerView addSubview:sv];
@@ -161,12 +155,6 @@ static UIScrollView *gTabSV[3];
 
     _activeTab = FLTabVisualization;
     [self refreshTabAppearance];
-
-    // เรียก Setup
-    if ([switches respondsToSelector:@selector(setupFluoriteLayout)]) {
-        [switches setupFluoriteLayout];
-    }
-
     return self;
 }
 
@@ -181,19 +169,9 @@ static UIScrollView *gTabSV[3];
     for (int i = 0; i < 3; i++) {
         UIButton *tb = _tabButtons[i];
         BOOL active  = (i == _activeTab);
-        [tb setTitleColor:active ? FL_TAB_ACTIVE : FL_TEXT_SEC forState:UIControlStateNormal];
-        // remove old pill
-        for (UIView *v in tb.subviews)
-            if (v.tag == 555) [v removeFromSuperview];
-        if (active) {
-            CGFloat pw = tb.bounds.size.width * 0.7f;
-            UIView *pill = [[UIView alloc] initWithFrame:CGRectMake(
-                (tb.bounds.size.width-pw)/2, tb.bounds.size.height-3, pw, 3)];
-            pill.tag                = 555;
-            pill.backgroundColor    = FL_TAB_ACTIVE;
-            pill.layer.cornerRadius = 1.5f;
-            [tb addSubview:pill];
-        }
+        [tb setTitleColor:active ? FL_TEXT_PRIMARY : FL_TEXT_SEC forState:UIControlStateNormal];
+        tb.backgroundColor = active ? FL_TAB_ACTIVE : [UIColor clearColor];
+        tb.layer.cornerRadius = 20.0f;
     }
 }
 
@@ -211,9 +189,8 @@ static UIScrollView *gTabSV[3];
 
     UIScrollView *sv = gTabSV[tab];
     [sv addSubview:row];
-    sv.contentSize = CGSizeMake(gMenuWidth, rowY + FL_ROW_H + 8);
+    sv.contentSize = CGSizeMake(gMenuWidth, rowY + FL_ROW_H + 24);
 
-    // restore saved toggle state
     if ([switch_ respondsToSelector:@selector(getPreferencesKey)]) {
         NSString *key = [switch_ performSelector:@selector(getPreferencesKey)];
         BOOL saved    = [defaults boolForKey:key];
@@ -222,11 +199,6 @@ static UIScrollView *gTabSV[3];
             [os restoreState:saved];
         }
     }
-
-    // row divider
-    UIView *div = [[UIView alloc] initWithFrame:CGRectMake(16, FL_ROW_H-0.5f, gMenuWidth-32, 0.5f)];
-    div.backgroundColor = FL_DIVIDER;
-    [row addSubview:div];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)gr {
@@ -243,26 +215,24 @@ static UIScrollView *gTabSV[3];
 
 - (void)showMenuButton {
     CGFloat s = 52.0f;
-    gMenuButton = [[UIButton alloc] initWithFrame:CGRectMake(
-        20, gMainWindow.bounds.size.height/2 - s/2, s, s)];
+    gMenuButton = [[UIButton alloc] initWithFrame:CGRectMake(20, gMainWindow.bounds.size.height/2 - s/2, s, s)];
     gMenuButton.backgroundColor    = FL_TAB_ACTIVE;
     gMenuButton.layer.cornerRadius = s/2;
-    gMenuButton.layer.shadowColor  = [UIColor colorWithRed:0.55f green:0.25f blue:0.90f alpha:0.7f].CGColor;
-    gMenuButton.layer.shadowOpacity = 0.9f;
+    gMenuButton.layer.shadowColor  = FL_TAB_ACTIVE.CGColor;
+    gMenuButton.layer.shadowOpacity = 0.6f;
     gMenuButton.layer.shadowRadius  = 12.0f;
     gMenuButton.layer.shadowOffset  = CGSizeMake(0,4);
 
     UILabel *lbl = [[UILabel alloc] initWithFrame:gMenuButton.bounds];
-    lbl.text          = @"🎱";
+    lbl.text          = @"❖";
+    lbl.textColor     = [UIColor whiteColor];
     lbl.font          = [UIFont systemFontOfSize:26];
     lbl.textAlignment = NSTextAlignmentCenter;
     [gMenuButton addSubview:lbl];
 
-    [gMenuButton addTarget:self action:@selector(openMenu)
-         forControlEvents:UIControlEventTouchUpInside];
+    [gMenuButton addTarget:self action:@selector(openMenu) forControlEvents:UIControlEventTouchUpInside];
 
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
-        initWithTarget:self action:@selector(dragButton:)];
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragButton:)];
     [gMenuButton addGestureRecognizer:pan];
 
     [gMainWindow addSubview:gMenuButton];
@@ -289,13 +259,10 @@ static UIScrollView *gTabSV[3];
 
 - (void)showPopup:(NSString *)title_ description:(NSString *)description_ {
     SCLAlertView *alert = [[SCLAlertView alloc] initWithNewWindow];
-    alert.customViewColor           = FL_TAB_ACTIVE;
-    alert.showAnimationType         = SCLAlertViewShowAnimationSlideInFromCenter;
+    alert.customViewColor = FL_TAB_ACTIVE;
+    alert.showAnimationType = SCLAlertViewShowAnimationSlideInFromCenter;
     alert.shouldDismissOnTapOutside = YES;
-    [alert showInfo:nil
-           subTitle:[NSString stringWithFormat:@"%@\n\n%@", title_, description_]
-   closeButtonTitle:@"OK"
-           duration:0];
+    [alert showInfo:nil subTitle:[NSString stringWithFormat:@"%@\n\n%@", title_, description_] closeButtonTitle:@"OK" duration:0];
 }
 
 @end
@@ -314,60 +281,47 @@ static UIScrollView *gTabSV[3];
             offsets:(std::vector<uint64_t>)offsets_
               bytes:(std::vector<std::string>)bytes_ {
 
-    self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
-    if(self) {
-        preferencesKey   = hackName_;
-        switchDescription = description_;
+    preferencesKey    = hackName_;
+    switchDescription = description_;
 
-        if (offsets_.size() != bytes_.size()) {
-            [menu showPopup:@"Invalid input count"
-                description:[NSString stringWithFormat:@"Offsets (%d) ≠ bytes (%d)",
-                             (int)offsets_.size(), (int)bytes_.size()]];
-        } else {
-            for (size_t i = 0; i < offsets_.size(); i++) {
-                MemoryPatch p = MemoryPatch::createWithHex(NULL, offsets_[i], bytes_[i]);
-                if (p.isValid()) memoryPatches.push_back(p);
-                else [menu showPopup:@"Invalid patch"
-                         description:[NSString stringWithFormat:@"Bad offset: 0x%llx", offsets_[i]]];
-            }
+    if (offsets_.size() != bytes_.size()) {
+        [menu showPopup:@"Invalid input count" description:@"Offsets ≠ bytes"];
+    } else {
+        for (size_t i = 0; i < offsets_.size(); i++) {
+            MemoryPatch p = MemoryPatch::createWithHex(NULL, offsets_[i], bytes_[i]);
+            if (p.isValid()) memoryPatches.push_back(p);
         }
-
-        self.backgroundColor = [UIColor clearColor];
-
-        toggleSwitch = [[UISwitch alloc] init];
-        toggleSwitch.onTintColor = FL_TAB_ACTIVE;
-        toggleSwitch.frame = CGRectMake(
-            gMenuWidth - toggleSwitch.frame.size.width - 16,
-            (FL_ROW_H  - toggleSwitch.frame.size.height)/2,
-            toggleSwitch.frame.size.width,
-            toggleSwitch.frame.size.height);
-        [toggleSwitch addTarget:self action:@selector(toggleChanged:)
-              forControlEvents:UIControlEventValueChanged];
-        [self addSubview:toggleSwitch];
-
-        switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(
-            16, 0, gMenuWidth - toggleSwitch.frame.size.width - 48, FL_ROW_H)];
-        switchLabel.text      = hackName_;
-        switchLabel.textColor = FL_TEXT_PRIMARY;
-        switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        [self addSubview:switchLabel];
-
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
-            initWithTarget:self action:@selector(rowDoubleTapped:)];
-        tap.numberOfTapsRequired = 2;
-        [self addGestureRecognizer:tap];
     }
+
+    self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
+    self.backgroundColor = [UIColor clearColor];
+
+    toggleSwitch = [[UISwitch alloc] init];
+    toggleSwitch.onTintColor = FL_TAB_ACTIVE;
+    toggleSwitch.frame = CGRectMake(
+        gMenuWidth - toggleSwitch.frame.size.width - 32,
+        (FL_ROW_H  - toggleSwitch.frame.size.height)/2,
+        toggleSwitch.frame.size.width,
+        toggleSwitch.frame.size.height);
+    [toggleSwitch addTarget:self action:@selector(toggleChanged:) forControlEvents:UIControlEventValueChanged];
+    [self addSubview:toggleSwitch];
+
+    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(32, 0, gMenuWidth - 100, FL_ROW_H)];
+    switchLabel.text      = hackName_;
+    switchLabel.textColor = FL_TEXT_PRIMARY;
+    switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self addSubview:switchLabel];
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showInfo)];
+    tap.numberOfTapsRequired = 2;
+    [self addGestureRecognizer:tap];
+
     return self;
 }
 
 - (void)restoreState:(BOOL)on {
-    toggleSwitch.on     = on;
-    self.backgroundColor = on
-        ? [FL_TAB_ACTIVE colorWithAlphaComponent:0.15f]
-        : [UIColor clearColor];
+    toggleSwitch.on = on;
 }
-
-- (void)rowDoubleTapped:(UITapGestureRecognizer *)gr { [self showInfo]; }
 
 - (void)showInfo {
     [menu showPopup:preferencesKey description:switchDescription];
@@ -376,11 +330,6 @@ static UIScrollView *gTabSV[3];
 - (void)toggleChanged:(UISwitch *)sender {
     BOOL on = sender.isOn;
     [defaults setBool:on forKey:preferencesKey];
-    [UIView animateWithDuration:0.2 animations:^{
-        self.backgroundColor = on
-            ? [FL_TAB_ACTIVE colorWithAlphaComponent:0.15f]
-            : [UIColor clearColor];
-    }];
     for (auto &p : memoryPatches)
         on ? p.Modify() : p.Restore();
 }
@@ -395,7 +344,6 @@ static UIScrollView *gTabSV[3];
 // ═══════════════════════════════════════════════════════════════
 //  TEXT-FIELD SWITCH
 // ═══════════════════════════════════════════════════════════════
-// แก้ Error redeclare: ไม่ต้องสร้าง { NSString *preferencesKey; UILabel *switchLabel; } ซ้ำ
 @implementation TextFieldSwitch {
     UITextField *textfieldValue;
 }
@@ -404,42 +352,37 @@ static UIScrollView *gTabSV[3];
              description:(NSString *)description_
        inputBorderColor:(UIColor *)inputBorderColor_ {
 
+    preferencesKey    = hackName_;
+    switchValueKey    = [hackName_ stringByApplyingTransform:NSStringTransformLatinToCyrillic reverse:NO];
+    switchDescription = description_;
+
     self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
-    if(self) {
-        preferencesKey    = hackName_;
-        switchValueKey    = [hackName_ stringByApplyingTransform:
-                                NSStringTransformLatinToCyrillic reverse:NO];
-        switchDescription = description_;
+    self.backgroundColor = [UIColor clearColor];
 
-        self.backgroundColor = [UIColor clearColor];
+    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(32, 0, gMenuWidth*0.5f, FL_ROW_H)];
+    switchLabel.text      = hackName_;
+    switchLabel.textColor = FL_TEXT_PRIMARY;
+    switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self addSubview:switchLabel];
 
-        switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth*0.5f, 22)];
-        switchLabel.text      = hackName_;
-        switchLabel.textColor = FL_TEXT_PRIMARY;
-        switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        [self addSubview:switchLabel];
+    textfieldValue = [[UITextField alloc] initWithFrame:CGRectMake(
+        gMenuWidth - 140 - 32, (FL_ROW_H - 34)/2, 140, 34)];
+    textfieldValue.layer.borderColor  = inputBorderColor_.CGColor;
+    textfieldValue.layer.borderWidth  = 1.5f;
+    textfieldValue.layer.cornerRadius = 10.0f;
+    textfieldValue.textColor          = FL_TEXT_PRIMARY;
+    textfieldValue.textAlignment      = NSTextAlignmentCenter;
+    textfieldValue.font               = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    textfieldValue.backgroundColor    = FL_PANEL;
+    textfieldValue.delegate           = self;
 
-        textfieldValue = [[UITextField alloc] initWithFrame:CGRectMake(
-            gMenuWidth*0.52f, 10, gMenuWidth*0.36f, 30)];
-        textfieldValue.layer.borderColor  = inputBorderColor_.CGColor;
-        textfieldValue.layer.borderWidth  = 1.5f;
-        textfieldValue.layer.cornerRadius = 8.0f;
-        textfieldValue.textColor          = FL_TEXT_PRIMARY;
-        textfieldValue.textAlignment      = NSTextAlignmentCenter;
-        textfieldValue.font               = [UIFont systemFontOfSize:13];
-        textfieldValue.backgroundColor    = FL_PANEL;
-        textfieldValue.delegate           = self;
-
-        NSString *saved = [defaults objectForKey:switchValueKey];
-        if (saved) textfieldValue.text = saved;
-        [self addSubview:textfieldValue];
-    }
+    NSString *saved = [defaults objectForKey:switchValueKey];
+    if (saved) textfieldValue.text = saved;
+    [self addSubview:textfieldValue];
     return self;
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)tf {
-    switchValueKey = [preferencesKey stringByApplyingTransform:
-                        NSStringTransformLatinToCyrillic reverse:NO];
     [defaults setObject:tf.text forKey:switchValueKey];
     [tf resignFirstResponder];
     return YES;
@@ -448,7 +391,6 @@ static UIScrollView *gTabSV[3];
 - (NSString *)getSwitchValueKey { return switchValueKey; }
 
 @end
-
 
 // ═══════════════════════════════════════════════════════════════
 //  SLIDER SWITCH
@@ -463,48 +405,43 @@ static UIScrollView *gTabSV[3];
          maximumValue:(float)maximumValue_
           sliderColor:(UIColor *)sliderColor_ {
 
-    self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
-    if(self) {
-        preferencesKey    = hackName_;
-        switchValueKey    = [hackName_ stringByApplyingTransform:
-                                NSStringTransformLatinToCyrillic reverse:NO];
-        switchDescription = description_;
+    preferencesKey    = hackName_;
+    switchValueKey    = [hackName_ stringByApplyingTransform:NSStringTransformLatinToCyrillic reverse:NO];
+    switchDescription = description_;
 
-        self.backgroundColor = [UIColor clearColor];
+    self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H + 20)];
+    self.backgroundColor = [UIColor clearColor];
 
-        switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth*0.5f, 20)];
-        switchLabel.text      = hackName_;
-        switchLabel.textColor = FL_TEXT_PRIMARY;
-        switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        [self addSubview:switchLabel];
+    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(32, 8, gMenuWidth*0.5f, 20)];
+    switchLabel.text      = hackName_;
+    switchLabel.textColor = FL_TEXT_PRIMARY;
+    switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self addSubview:switchLabel];
 
-        sliderValue = [[UISlider alloc] initWithFrame:CGRectMake(16, 28, gMenuWidth-100, 20)];
-        sliderValue.minimumValue          = minimumValue_;
-        sliderValue.maximumValue          = maximumValue_;
-        sliderValue.thumbTintColor        = sliderColor_;
-        sliderValue.minimumTrackTintColor = FL_TAB_ACTIVE;
-        sliderValue.maximumTrackTintColor = FL_DIVIDER;
-        sliderValue.continuous            = YES;
-        [sliderValue addTarget:self action:@selector(sliderChanged:)
-             forControlEvents:UIControlEventValueChanged];
+    sliderValue = [[UISlider alloc] initWithFrame:CGRectMake(32, 34, gMenuWidth-120, 20)];
+    sliderValue.minimumValue          = minimumValue_;
+    sliderValue.maximumValue          = maximumValue_;
+    sliderValue.thumbTintColor        = sliderColor_;
+    sliderValue.minimumTrackTintColor = FL_TAB_ACTIVE;
+    sliderValue.maximumTrackTintColor = FL_PANEL;
+    sliderValue.continuous            = YES;
+    [sliderValue addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
 
-        float saved = [defaults floatForKey:switchValueKey];
-        if (saved != 0) sliderValue.value = saved;
+    float saved = [defaults floatForKey:switchValueKey];
+    if (saved != 0) sliderValue.value = saved;
 
-        UILabel *valLbl = [[UILabel alloc] initWithFrame:CGRectMake(gMenuWidth-78, 28, 62, 20)];
-        valLbl.tag       = 77;
-        valLbl.textColor = FL_TEXT_SEC;
-        valLbl.font      = [UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightRegular];
-        valLbl.text      = [NSString stringWithFormat:@"%.2f", sliderValue.value];
-        [self addSubview:valLbl];
-        [self addSubview:sliderValue];
-    }
+    UILabel *valLbl = [[UILabel alloc] initWithFrame:CGRectMake(gMenuWidth-80, 34, 50, 20)];
+    valLbl.tag       = 77;
+    valLbl.textColor = FL_TEXT_SEC;
+    valLbl.font      = [UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightMedium];
+    valLbl.text      = [NSString stringWithFormat:@"%.2f", sliderValue.value];
+    [self addSubview:valLbl];
+    [self addSubview:sliderValue];
+    
     return self;
 }
 
 - (void)sliderChanged:(UISlider *)s {
-    switchValueKey = [preferencesKey stringByApplyingTransform:
-                        NSStringTransformLatinToCyrillic reverse:NO];
     [defaults setFloat:s.value forKey:switchValueKey];
     UILabel *lbl = (UILabel *)[self viewWithTag:77];
     lbl.text = [NSString stringWithFormat:@"%.2f", s.value];
@@ -513,7 +450,7 @@ static UIScrollView *gTabSV[3];
 @end
 
 // ═══════════════════════════════════════════════════════════════
-//  ACTION BUTTON (Standalone Button Row)
+//  ACTION BUTTON ROW (แก้ไขให้เรียกใช้ super และสืบทอดจาก UIView สำเร็จ)
 // ═══════════════════════════════════════════════════════════════
 @implementation ActionButton {
     void (^action)(void);
@@ -522,38 +459,43 @@ static UIScrollView *gTabSV[3];
 - (id)initButtonNamed:(NSString *)btnName
              colWidth:(CGFloat)colWidth
           actionBlock:(void (^)(void))actionBlock {
-    // แก้ไข: สืบทอดจาก UIView ทำให้ใช้ [super initWithFrame:] และ [self addSubview:] ได้
+          
+    // เรียก [super initWithFrame:] ได้แล้วเพราะอิงจาก UIView
     self = [super initWithFrame:CGRectMake(0, 0, colWidth, FL_ROW_H)];
     if (self) {
+        self.backgroundColor = [UIColor clearColor];
         action = actionBlock;
+
         UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-        btn.frame = CGRectMake(16, (FL_ROW_H - 30)/2, colWidth - 32, 30);
+        btn.frame = CGRectMake(32, 8, colWidth - 64, FL_ROW_H - 16);
         btn.backgroundColor = FL_PANEL;
-        btn.layer.cornerRadius = 8.0f;
+        btn.layer.cornerRadius = 10.0f;
         [btn setTitle:btnName forState:UIControlStateNormal];
         [btn setTitleColor:FL_TEXT_PRIMARY forState:UIControlStateNormal];
-        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-        [btn addTarget:self action:@selector(buttonTapped) forControlEvents:UIControlEventTouchUpInside];
-        [self addSubview:btn];
+        btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+        [btn addTarget:self action:@selector(btnTapped) forControlEvents:UIControlEventTouchUpInside];
+        
+        [self addSubview:btn]; // ไม่มี error ตรงนี้แล้ว!
     }
     return self;
 }
 
-- (void)buttonTapped {
-    if (action) action();
+- (void)btnTapped {
+    if (action) {
+        action();
+    }
 }
-
 @end
 
 
 // ═══════════════════════════════════════════════════════════════
-//  SWITCHES BUILDER API
+//  SWITCHES BUILDER
 // ═══════════════════════════════════════════════════════════════
 @implementation Switches
 
 - (void)setupFluoriteLayout {
-    // วาง Method นี้ทิ้งไว้เพื่อไม่ให้ Error ใน Menu.mm
-    // คุณสามารถไปเรียกการสร้างสวิตช์ต่างๆ ของคุณใน Tweak.xm ได้ตามปกติ
+    // ใส่โค้ดเริ่มต้น หรือเรียกคำสั่งตั้งค่าต่างๆ ในนี้ได้เลย
+    // Theos จะหา Method นี้เจอแล้วเพราะคุณเพิ่งประกาศลง Menu.h
 }
 
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ {
@@ -609,16 +551,16 @@ static UIScrollView *gTabSV[3];
     [menu addSwitchToMenu:s tab:FLTabVisualization];
 }
 
-- (void)addButton:(NSString *)btnName 
-           action:(void (^)(void))actionBlock 
+- (void)addButton:(NSString *)btnName
+           action:(void (^)(void))actionBlock
               tab:(FLTab)tab {
-        ActionButton *btn = [[ActionButton alloc] initButtonNamed:btnName colWidth:(gMenuWidth/3.0f) actionBlock:actionBlock];
+    // ✅ เรียกใช้ ActionBlock ถูกต้องตรงตามในวงเล็บเด๊ะๆ แล้วครับ
+    ActionButton *btn = [[ActionButton alloc] initButtonNamed:btnName colWidth:gMenuWidth actionBlock:actionBlock];
     [menu addSwitchToMenu:btn tab:tab];
 }
 
 - (NSString *)getValueFromSwitch:(NSString *)name {
-    NSString *key = [name stringByApplyingTransform:
-                        NSStringTransformLatinToCyrillic reverse:NO];
+    NSString *key = [name stringByApplyingTransform:NSStringTransformLatinToCyrillic reverse:NO];
     NSString *str = [[NSUserDefaults standardUserDefaults] objectForKey:key];
     if (str) return str;
     float fv = [[NSUserDefaults standardUserDefaults] floatForKey:key];
