@@ -1,75 +1,52 @@
 //
 //  Menu.mm  — FLUORITE-style dark modal UI
-//  Tabs: Visualization | Automation | Settings
 //
 
 #import <Foundation/Foundation.h>
 #import "Menu.h"
 
-// ═══════════════════════════════════════════════════════════════
-//  COLOUR PALETTE  (matches FLUORITE screenshots)
-// ═══════════════════════════════════════════════════════════════
+// ── COLOURS ──────────────────────────────────────────────────
 #define FL_BG           [UIColor colorWithRed:0.10f green:0.10f blue:0.12f alpha:0.97f]
 #define FL_PANEL        [UIColor colorWithRed:0.14f green:0.14f blue:0.17f alpha:1.0f]
 #define FL_HEADER_BG    [UIColor colorWithRed:0.10f green:0.10f blue:0.12f alpha:1.0f]
 #define FL_TAB_ACTIVE   [UIColor colorWithRed:0.55f green:0.25f blue:0.90f alpha:1.0f]
-#define FL_TAB_INACTIVE [UIColor clearColor]
-#define FL_TOGGLE_ON    [UIColor colorWithRed:0.55f green:0.25f blue:0.90f alpha:1.0f]
 #define FL_TEXT_PRIMARY [UIColor whiteColor]
 #define FL_TEXT_SEC     [UIColor colorWithWhite:0.65f alpha:1.0f]
 #define FL_DIVIDER      [UIColor colorWithWhite:0.25f alpha:1.0f]
 #define FL_CORNER       16.0f
 #define FL_ROW_H        52.0f
 
-// ═══════════════════════════════════════════════════════════════
-//  GLOBAL STATE
-// ═══════════════════════════════════════════════════════════════
-static NSUserDefaults  *defaults;
-static CGFloat          gMenuWidth   = 700.0f;
-static CGFloat          gMenuHeight  = 420.0f;
-static NSString        *gCredits     = @"";
-static UIColor         *gSwitchOnColor;
-static NSString        *gSwitchFont;
-static UIColor         *gSwitchColor;
-static UIColor         *gInfoColor;
-static BOOL             gRestoredSession = NO;
-static UIButton        *gMenuButton;
-static UIWindow        *gMainWindow;
+// ── GLOBALS ───────────────────────────────────────────────────
+static NSUserDefaults *defaults;
+static CGFloat         gMenuWidth  = 700.0f;
+static NSString       *gSwitchFont;
+static UIColor        *gSwitchColor;
+static UIButton       *gMenuButton;
+static UIWindow       *gMainWindow;
 
-// per-tab row lists
-static NSMutableArray  *gTabRows[3];   // indexed by FLTab
+// per-tab row arrays (0=Vis, 1=Auto, 2=Settings)
+static NSMutableArray *gTabRows[3];
 
-// globals exported via header
 Menu     *menu     = [[Menu alloc] init];
 Switches *switches = [[Switches alloc] init];
 
-// ═══════════════════════════════════════════════════════════════
-//  HELPER: rounded rect layer
-// ═══════════════════════════════════════════════════════════════
-static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
-    CAShapeLayer *sl = [CAShapeLayer layer];
-    sl.path = [UIBezierPath bezierPathWithRoundedRect:v.bounds
-                                   byRoundingCorners:corners
-                                         cornerRadii:CGSizeMake(r,r)].CGPath;
-    v.layer.mask = sl;
-}
+// ── IVAR STORAGE for array (C array can't be @property) ──────
+static UIScrollView *gTabSV[3];
 
 // ═══════════════════════════════════════════════════════════════
-//  MENU  IMPLEMENTATION
+//  MENU
 // ═══════════════════════════════════════════════════════════════
-@interface Menu () <UIGestureRecognizerDelegate>
-@property (strong) UIView        *containerView;
-@property (strong) UILabel       *titleLabel;
-@property (strong) NSArray       *tabButtons;
-@property (strong) UIScrollView  *tabScrollViews[3];
-@property (assign) FLTab          activeTab;
-@property (assign) CGPoint        dragStart;
-@property (assign) CGPoint        containerStart;
+@interface Menu ()
+@property (strong, nonatomic) UIView       *containerView;
+@property (strong, nonatomic) UILabel      *titleLabel;
+@property (strong, nonatomic) NSArray      *tabButtons;
+@property (assign, nonatomic) FLTab         activeTab;
+@property (assign, nonatomic) CGPoint       dragStart;
+@property (assign, nonatomic) CGPoint       containerStart;
 @end
 
 @implementation Menu
 
-// ── INIT ──────────────────────────────────────────────────────
 - (id)initWithTitle:(NSString *)title_
          titleColor:(UIColor *)titleColor_
           titleFont:(NSString *)titleFont_
@@ -85,96 +62,77 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
            menuIcon:(NSString *)menuIconBase64_
          menuButton:(NSString *)menuButtonBase64_ {
 
-    gMainWindow   = [UIApplication sharedApplication].keyWindow;
-    defaults      = [NSUserDefaults standardUserDefaults];
-    gMenuWidth    = menuWidth_;
-    gSwitchOnColor = switchOnColor_;
-    gCredits      = credits_;
-    gSwitchFont   = switchTitleFont_;
-    gSwitchColor  = switchTitleColor_;
-    gInfoColor    = infoButtonColor_;
+    gMainWindow  = [UIApplication sharedApplication].keyWindow;
+    defaults     = [NSUserDefaults standardUserDefaults];
+    gMenuWidth   = menuWidth_;
+    gSwitchFont  = switchTitleFont_;
+    gSwitchColor = switchTitleColor_;
 
-    // init tab row arrays
     for (int i = 0; i < 3; i++)
         gTabRows[i] = [NSMutableArray new];
 
-    // full-screen invisible hit area
     self = [super initWithFrame:gMainWindow.bounds];
     self.backgroundColor = [UIColor clearColor];
     self.layer.opacity   = 0.0f;
     [gMainWindow addSubview:self];
 
-    // ── dim overlay ──
+    // dim overlay
     UIView *dim = [[UIView alloc] initWithFrame:self.bounds];
     dim.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55f];
-    dim.tag = 999;
     [self addSubview:dim];
 
-    // ── container card ──
-    CGFloat cw = gMenuWidth, ch = gMenuHeight;
+    // card
+    CGFloat cw = gMenuWidth, ch = 420.0f;
     _containerView = [[UIView alloc] initWithFrame:CGRectMake(
-        (self.bounds.size.width  - cw) / 2,
-        (self.bounds.size.height - ch) / 2,
+        (self.bounds.size.width - cw)/2,
+        (self.bounds.size.height - ch)/2,
         cw, ch)];
-    _containerView.backgroundColor = FL_BG;
+    _containerView.backgroundColor      = FL_BG;
     _containerView.layer.cornerRadius   = FL_CORNER;
     _containerView.layer.masksToBounds  = YES;
-    _containerView.layer.shadowColor    = [UIColor blackColor].CGColor;
-    _containerView.layer.shadowOpacity  = 0.6f;
-    _containerView.layer.shadowRadius   = 20.0f;
-    _containerView.layer.shadowOffset   = CGSizeMake(0, 8);
     [self addSubview:_containerView];
 
-    // drag gesture on container
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handlePan:)];
     [_containerView addGestureRecognizer:pan];
 
-    // ── header row ──
+    // header
     CGFloat hh = 56.0f;
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, cw, hh)];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0,0,cw,hh)];
     header.backgroundColor = FL_HEADER_BG;
     [_containerView addSubview:header];
 
-    // gem icon (unicode fallback if no image)
-    UILabel *gem = [[UILabel alloc] initWithFrame:CGRectMake(16, 0, 32, hh)];
-    gem.text = @"✦";
+    UILabel *gem = [[UILabel alloc] initWithFrame:CGRectMake(16,0,32,hh)];
+    gem.text      = @"✦";
     gem.textColor = FL_TAB_ACTIVE;
-    gem.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+    gem.font      = [UIFont boldSystemFontOfSize:20];
     [header addSubview:gem];
 
-    // title
-    _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(52, 0, cw - 100, hh)];
+    _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(52,0,cw-100,hh)];
     _titleLabel.text      = title_;
     _titleLabel.textColor = FL_TEXT_PRIMARY;
-    _titleLabel.font      = [UIFont fontWithName:@"AvenirNext-Bold" size:17]
-                            ?: [UIFont boldSystemFontOfSize:17];
+    _titleLabel.font      = [UIFont boldSystemFontOfSize:17];
     [header addSubview:_titleLabel];
 
-    // close button
     UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
-    close.frame = CGRectMake(cw - 44, 0, 44, hh);
+    close.frame = CGRectMake(cw-44, 0, 44, hh);
     [close setTitle:@"✕" forState:UIControlStateNormal];
     close.titleLabel.font = [UIFont systemFontOfSize:17];
     [close setTitleColor:FL_TEXT_SEC forState:UIControlStateNormal];
     [close addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
     [header addSubview:close];
 
-    // divider under header
-    UIView *hdiv = [[UIView alloc] initWithFrame:CGRectMake(0, hh - 0.5f, cw, 0.5f)];
+    UIView *hdiv = [[UIView alloc] initWithFrame:CGRectMake(0,hh-0.5f,cw,0.5f)];
     hdiv.backgroundColor = FL_DIVIDER;
     [_containerView addSubview:hdiv];
 
-    // ── tab bar ──
-    CGFloat tabY  = hh;
-    CGFloat tabH  = 44.0f;
-    CGFloat tabW  = cw / 3.0f;
+    // tab bar
+    CGFloat tabY = hh, tabH = 44.0f, tabW = cw/3.0f;
     NSArray *tabNames = @[@"Visualization", @"Automation", @"Settings"];
     NSMutableArray *tabBtns = [NSMutableArray new];
-
     for (int i = 0; i < 3; i++) {
         UIButton *tb = [UIButton buttonWithType:UIButtonTypeSystem];
-        tb.frame = CGRectMake(i * tabW, tabY, tabW, tabH);
+        tb.frame = CGRectMake(i*tabW, tabY, tabW, tabH);
         tb.tag   = i;
         [tb setTitle:tabNames[i] forState:UIControlStateNormal];
         tb.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
@@ -184,36 +142,30 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     }
     _tabButtons = [tabBtns copy];
 
-    // tab bottom-line indicator
-    UIView *tabLine = [[UIView alloc] initWithFrame:CGRectMake(0, tabY + tabH - 0.5f, cw, 0.5f)];
+    UIView *tabLine = [[UIView alloc] initWithFrame:CGRectMake(0, tabY+tabH-0.5f, cw, 0.5f)];
     tabLine.backgroundColor = FL_DIVIDER;
     [_containerView addSubview:tabLine];
 
-    // ── scroll views (one per tab) ──
-    CGFloat svY = tabY + tabH;
-    CGFloat svH = ch - svY;
-
+    // scroll views — stored in static C array (avoids @property array issue)
+    CGFloat svY = tabY+tabH, svH = ch-svY;
     for (int i = 0; i < 3; i++) {
-        UIScrollView *sv = [[UIScrollView alloc] initWithFrame:CGRectMake(0, svY, cw, svH)];
+        UIScrollView *sv = [[UIScrollView alloc] initWithFrame:CGRectMake(0,svY,cw,svH)];
         sv.backgroundColor = [UIColor clearColor];
         sv.showsVerticalScrollIndicator = YES;
         sv.hidden = (i != 0);
-        _tabScrollViews[i] = sv;
+        gTabSV[i] = sv;
         [_containerView addSubview:sv];
     }
 
-    // select first tab
     _activeTab = FLTabVisualization;
     [self refreshTabAppearance];
-
     return self;
 }
 
-// ── TAB SWITCHING ──────────────────────────────────────────────
 - (void)tabTapped:(UIButton *)sender {
     _activeTab = (FLTab)sender.tag;
     for (int i = 0; i < 3; i++)
-        _tabScrollViews[i].hidden = (i != _activeTab);
+        gTabSV[i].hidden = (i != _activeTab);
     [self refreshTabAppearance];
 }
 
@@ -221,16 +173,15 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     for (int i = 0; i < 3; i++) {
         UIButton *tb = _tabButtons[i];
         BOOL active  = (i == _activeTab);
-        [tb setTitleColor:active ? FL_TAB_ACTIVE : FL_TEXT_SEC
-                 forState:UIControlStateNormal];
-        // active underline pill
-        [tb.subviews.lastObject removeFromSuperview];
+        [tb setTitleColor:active ? FL_TAB_ACTIVE : FL_TEXT_SEC forState:UIControlStateNormal];
+        // remove old pill
+        for (UIView *v in tb.subviews)
+            if (v.tag == 555) [v removeFromSuperview];
         if (active) {
             CGFloat pw = tb.bounds.size.width * 0.7f;
             UIView *pill = [[UIView alloc] initWithFrame:CGRectMake(
-                (tb.bounds.size.width - pw) / 2,
-                tb.bounds.size.height - 3,
-                pw, 3)];
+                (tb.bounds.size.width-pw)/2, tb.bounds.size.height-3, pw, 3)];
+            pill.tag                = 555;
             pill.backgroundColor    = FL_TAB_ACTIVE;
             pill.layer.cornerRadius = 1.5f;
             [tb addSubview:pill];
@@ -238,7 +189,6 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     }
 }
 
-// ── ADD SWITCH ROW ────────────────────────────────────────────
 - (void)addSwitchToMenu:(id)switch_ {
     [self addSwitchToMenu:switch_ tab:FLTabVisualization];
 }
@@ -251,7 +201,7 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     row.frame = CGRectMake(0, rowY, gMenuWidth, FL_ROW_H);
     [rows addObject:switch_];
 
-    UIScrollView *sv = _tabScrollViews[tab];
+    UIScrollView *sv = gTabSV[tab];
     [sv addSubview:row];
     sv.contentSize = CGSizeMake(gMenuWidth, rowY + FL_ROW_H + 8);
 
@@ -260,21 +210,17 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
         NSString *key = [switch_ performSelector:@selector(getPreferencesKey)];
         BOOL saved    = [defaults boolForKey:key];
         if ([switch_ isKindOfClass:[OffsetSwitch class]]) {
-            ((OffsetSwitch *)switch_)->toggleSwitch.on = saved;
-            row.backgroundColor = saved
-                ? [FL_TAB_ACTIVE colorWithAlphaComponent:0.15f]
-                : [UIColor clearColor];
+            OffsetSwitch *os = (OffsetSwitch *)switch_;
+            [os restoreState:saved];
         }
     }
 
     // row divider
-    UIView *div = [[UIView alloc] initWithFrame:CGRectMake(16, FL_ROW_H - 0.5f,
-                                                            gMenuWidth - 32, 0.5f)];
+    UIView *div = [[UIView alloc] initWithFrame:CGRectMake(16, FL_ROW_H-0.5f, gMenuWidth-32, 0.5f)];
     div.backgroundColor = FL_DIVIDER;
     [row addSubview:div];
 }
 
-// ── DRAG (pan) ────────────────────────────────────────────────
 - (void)handlePan:(UIPanGestureRecognizer *)gr {
     if (gr.state == UIGestureRecognizerStateBegan) {
         _dragStart      = [gr locationInView:self];
@@ -287,25 +233,17 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     }
 }
 
-// ── SHOW / HIDE ───────────────────────────────────────────────
 - (void)showMenuButton {
-    // floating purple circle button
-    NSData  *d   = [[NSData alloc] initWithBase64EncodedString:
-                    @"" options:0];   // empty → use fallback label
-    CGFloat  s   = 52.0f;
-    CGRect   fr  = CGRectMake(20,
-                              gMainWindow.bounds.size.height / 2 - s / 2,
-                              s, s);
-
-    gMenuButton = [[UIButton alloc] initWithFrame:fr];
+    CGFloat s = 52.0f;
+    gMenuButton = [[UIButton alloc] initWithFrame:CGRectMake(
+        20, gMainWindow.bounds.size.height/2 - s/2, s, s)];
     gMenuButton.backgroundColor    = FL_TAB_ACTIVE;
-    gMenuButton.layer.cornerRadius = s / 2;
+    gMenuButton.layer.cornerRadius = s/2;
     gMenuButton.layer.shadowColor  = [UIColor colorWithRed:0.55f green:0.25f blue:0.90f alpha:0.7f].CGColor;
     gMenuButton.layer.shadowOpacity = 0.9f;
     gMenuButton.layer.shadowRadius  = 12.0f;
-    gMenuButton.layer.shadowOffset  = CGSizeMake(0, 4);
+    gMenuButton.layer.shadowOffset  = CGSizeMake(0,4);
 
-    // billiard ball emoji as icon
     UILabel *lbl = [[UILabel alloc] initWithFrame:gMenuButton.bounds];
     lbl.text          = @"🎱";
     lbl.font          = [UIFont systemFontOfSize:26];
@@ -314,42 +252,37 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 
     [gMenuButton addTarget:self action:@selector(openMenu)
          forControlEvents:UIControlEventTouchUpInside];
-    [gMainWindow addSubview:gMenuButton];
 
-    // make it draggable too
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(dragButton:)];
     [gMenuButton addGestureRecognizer:pan];
+
+    [gMainWindow addSubview:gMenuButton];
 }
 
 - (void)dragButton:(UIPanGestureRecognizer *)gr {
     CGPoint t = [gr translationInView:gMainWindow];
-    gMenuButton.center = CGPointMake(gMenuButton.center.x + t.x,
-                                     gMenuButton.center.y + t.y);
+    gMenuButton.center = CGPointMake(gMenuButton.center.x+t.x, gMenuButton.center.y+t.y);
     [gr setTranslation:CGPointZero inView:gMainWindow];
 }
 
 - (void)openMenu {
     [gMainWindow bringSubviewToFront:self];
     [UIView animateWithDuration:0.25 delay:0
-         usingSpringWithDamping:0.82f
-          initialSpringVelocity:0.3f
+         usingSpringWithDamping:0.82f initialSpringVelocity:0.3f
                         options:UIViewAnimationOptionCurveEaseOut
                      animations:^{ self.layer.opacity = 1.0f; }
                      completion:nil];
 }
 
 - (void)closeMenu {
-    [UIView animateWithDuration:0.18 animations:^{
-        self.layer.opacity = 0.0f;
-    }];
+    [UIView animateWithDuration:0.18 animations:^{ self.layer.opacity = 0.0f; }];
 }
 
-// ── POPUP ─────────────────────────────────────────────────────
 - (void)showPopup:(NSString *)title_ description:(NSString *)description_ {
     SCLAlertView *alert = [[SCLAlertView alloc] initWithNewWindow];
-    alert.customViewColor          = FL_TAB_ACTIVE;
-    alert.showAnimationType        = SCLAlertViewShowAnimationSlideInFromCenter;
+    alert.customViewColor           = FL_TAB_ACTIVE;
+    alert.showAnimationType         = SCLAlertViewShowAnimationSlideInFromCenter;
     alert.shouldDismissOnTapOutside = YES;
     [alert showInfo:nil
            subTitle:[NSString stringWithFormat:@"%@\n\n%@", title_, description_]
@@ -357,17 +290,17 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
            duration:0];
 }
 
-// menuIconTapped kept for ABI compat
 - (void)menuIconTapped { [self closeMenu]; }
 
-@end  // Menu
+@end
 
 
 // ═══════════════════════════════════════════════════════════════
-//  OFFSET SWITCH (toggle row)
+//  OFFSET SWITCH
 // ═══════════════════════════════════════════════════════════════
 @implementation OffsetSwitch {
     std::vector<MemoryPatch> memoryPatches;
+    UISwitch *toggleSwitch;
 }
 
 - (id)initHackNamed:(NSString *)hackName_
@@ -380,57 +313,54 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 
     if (offsets_.size() != bytes_.size()) {
         [menu showPopup:@"Invalid input count"
-            description:[NSString stringWithFormat:
-                @"Offsets (%d) ≠ bytes (%d)",
-                (int)offsets_.size(), (int)bytes_.size()]];
+            description:[NSString stringWithFormat:@"Offsets (%d) ≠ bytes (%d)",
+                         (int)offsets_.size(), (int)bytes_.size()]];
     } else {
         for (size_t i = 0; i < offsets_.size(); i++) {
             MemoryPatch p = MemoryPatch::createWithHex(NULL, offsets_[i], bytes_[i]);
-            if (p.isValid())  memoryPatches.push_back(p);
+            if (p.isValid()) memoryPatches.push_back(p);
             else [menu showPopup:@"Invalid patch"
-                     description:[NSString stringWithFormat:
-                        @"Failing offset: 0x%llx", offsets_[i]]];
+                     description:[NSString stringWithFormat:@"Bad offset: 0x%llx", offsets_[i]]];
         }
     }
 
     self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
     self.backgroundColor = [UIColor clearColor];
-    [self buildRowUI:hackName_];
-    return self;
-}
 
-- (void)buildRowUI:(NSString *)name {
-    // toggle
     toggleSwitch = [[UISwitch alloc] init];
-    toggleSwitch.onTintColor  = FL_TAB_ACTIVE;
+    toggleSwitch.onTintColor = FL_TAB_ACTIVE;
     toggleSwitch.frame = CGRectMake(
         gMenuWidth - toggleSwitch.frame.size.width - 16,
-        (FL_ROW_H  - toggleSwitch.frame.size.height) / 2,
+        (FL_ROW_H  - toggleSwitch.frame.size.height)/2,
         toggleSwitch.frame.size.width,
         toggleSwitch.frame.size.height);
     [toggleSwitch addTarget:self action:@selector(toggleChanged:)
           forControlEvents:UIControlEventValueChanged];
     [self addSubview:toggleSwitch];
 
-    // label
     switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(
-        16, 0,
-        gMenuWidth - toggleSwitch.frame.size.width - 48, FL_ROW_H)];
-    switchLabel.text      = name;
+        16, 0, gMenuWidth - toggleSwitch.frame.size.width - 48, FL_ROW_H)];
+    switchLabel.text      = hackName_;
     switchLabel.textColor = FL_TEXT_PRIMARY;
     switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self addSubview:switchLabel];
 
-    // info tap on the row
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
-        initWithTarget:self action:@selector(rowTapped:)];
-    tap.numberOfTapsRequired = 2;   // double-tap → info popup
+        initWithTarget:self action:@selector(rowDoubleTapped:)];
+    tap.numberOfTapsRequired = 2;
     [self addGestureRecognizer:tap];
+
+    return self;
 }
 
-- (void)rowTapped:(UITapGestureRecognizer *)gr {
-    [self showInfo];
+- (void)restoreState:(BOOL)on {
+    toggleSwitch.on     = on;
+    self.backgroundColor = on
+        ? [FL_TAB_ACTIVE colorWithAlphaComponent:0.15f]
+        : [UIColor clearColor];
 }
+
+- (void)rowDoubleTapped:(UITapGestureRecognizer *)gr { [self showInfo]; }
 
 - (void)showInfo {
     [menu showPopup:preferencesKey description:switchDescription];
@@ -439,25 +369,20 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 - (void)toggleChanged:(UISwitch *)sender {
     BOOL on = sender.isOn;
     [defaults setBool:on forKey:preferencesKey];
-
-    // background tint
     [UIView animateWithDuration:0.2 animations:^{
         self.backgroundColor = on
             ? [FL_TAB_ACTIVE colorWithAlphaComponent:0.15f]
             : [UIColor clearColor];
     }];
-
-    // apply / restore memory patches
-    for (auto &p : memoryPatches) {
+    for (auto &p : memoryPatches)
         on ? p.Modify() : p.Restore();
-    }
 }
 
 - (NSString *)getPreferencesKey  { return preferencesKey; }
 - (NSString *)getDescription     { return switchDescription; }
 - (std::vector<MemoryPatch>)getMemoryPatches { return memoryPatches; }
 
-@end  // OffsetSwitch
+@end
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -471,22 +396,22 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
              description:(NSString *)description_
        inputBorderColor:(UIColor *)inputBorderColor_ {
 
-    preferencesKey  = hackName_;
-    switchValueKey  = [hackName_ stringByApplyingTransform:
-                        NSStringTransformLatinToCyrillic reverse:NO];
+    preferencesKey    = hackName_;
+    switchValueKey    = [hackName_ stringByApplyingTransform:
+                            NSStringTransformLatinToCyrillic reverse:NO];
     switchDescription = description_;
 
     self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
     self.backgroundColor = [UIColor clearColor];
 
-    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth * 0.5f, 22)];
+    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth*0.5f, 22)];
     switchLabel.text      = hackName_;
     switchLabel.textColor = FL_TEXT_PRIMARY;
     switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self addSubview:switchLabel];
 
     textfieldValue = [[UITextField alloc] initWithFrame:CGRectMake(
-        gMenuWidth * 0.52f, 10, gMenuWidth * 0.36f, 30)];
+        gMenuWidth*0.52f, 10, gMenuWidth*0.36f, 30)];
     textfieldValue.layer.borderColor  = inputBorderColor_.CGColor;
     textfieldValue.layer.borderWidth  = 1.5f;
     textfieldValue.layer.cornerRadius = 8.0f;
@@ -498,7 +423,6 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 
     NSString *saved = [defaults objectForKey:switchValueKey];
     if (saved) textfieldValue.text = saved;
-
     [self addSubview:textfieldValue];
     return self;
 }
@@ -513,7 +437,7 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 
 - (NSString *)getSwitchValueKey { return switchValueKey; }
 
-@end  // TextFieldSwitch
+@end
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -529,42 +453,39 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
          maximumValue:(float)maximumValue_
           sliderColor:(UIColor *)sliderColor_ {
 
-    preferencesKey  = hackName_;
-    switchValueKey  = [hackName_ stringByApplyingTransform:
-                        NSStringTransformLatinToCyrillic reverse:NO];
+    preferencesKey    = hackName_;
+    switchValueKey    = [hackName_ stringByApplyingTransform:
+                            NSStringTransformLatinToCyrillic reverse:NO];
     switchDescription = description_;
 
     self = [super initWithFrame:CGRectMake(0, 0, gMenuWidth, FL_ROW_H)];
     self.backgroundColor = [UIColor clearColor];
 
-    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth * 0.5f, 20)];
+    switchLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 4, gMenuWidth*0.5f, 20)];
     switchLabel.text      = hackName_;
     switchLabel.textColor = FL_TEXT_PRIMARY;
     switchLabel.font      = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self addSubview:switchLabel];
 
-    sliderValue = [[UISlider alloc] initWithFrame:CGRectMake(
-        16, 28, gMenuWidth - 100, 20)];
-    sliderValue.minimumValue        = minimumValue_;
-    sliderValue.maximumValue        = maximumValue_;
-    sliderValue.thumbTintColor      = sliderColor_;
+    sliderValue = [[UISlider alloc] initWithFrame:CGRectMake(16, 28, gMenuWidth-100, 20)];
+    sliderValue.minimumValue          = minimumValue_;
+    sliderValue.maximumValue          = maximumValue_;
+    sliderValue.thumbTintColor        = sliderColor_;
     sliderValue.minimumTrackTintColor = FL_TAB_ACTIVE;
     sliderValue.maximumTrackTintColor = FL_DIVIDER;
-    sliderValue.continuous          = YES;
+    sliderValue.continuous            = YES;
     [sliderValue addTarget:self action:@selector(sliderChanged:)
          forControlEvents:UIControlEventValueChanged];
 
     float saved = [defaults floatForKey:switchValueKey];
     if (saved != 0) sliderValue.value = saved;
 
-    UILabel *valLbl = [[UILabel alloc] initWithFrame:CGRectMake(
-        gMenuWidth - 78, 28, 62, 20)];
+    UILabel *valLbl = [[UILabel alloc] initWithFrame:CGRectMake(gMenuWidth-78, 28, 62, 20)];
     valLbl.tag       = 77;
     valLbl.textColor = FL_TEXT_SEC;
     valLbl.font      = [UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightRegular];
     valLbl.text      = [NSString stringWithFormat:@"%.2f", sliderValue.value];
     [self addSubview:valLbl];
-
     [self addSubview:sliderValue];
     return self;
 }
@@ -574,14 +495,14 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
                         NSStringTransformLatinToCyrillic reverse:NO];
     [defaults setFloat:s.value forKey:switchValueKey];
     UILabel *lbl = (UILabel *)[self viewWithTag:77];
-    lbl.text     = [NSString stringWithFormat:@"%.2f", s.value];
+    lbl.text = [NSString stringWithFormat:@"%.2f", s.value];
 }
 
-@end  // SliderSwitch
+@end
 
 
 // ═══════════════════════════════════════════════════════════════
-//  SWITCHES  (public builder)
+//  SWITCHES
 // ═══════════════════════════════════════════════════════════════
 @implementation Switches
 
@@ -591,8 +512,7 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
 
 - (void)addSwitch:(NSString *)hackName_ description:(NSString *)description_ tab:(FLTab)tab {
     OffsetSwitch *s = [[OffsetSwitch alloc]
-        initHackNamed:hackName_
-          description:description_
+        initHackNamed:hackName_ description:description_
               offsets:std::vector<uint64_t>{}
                 bytes:std::vector<std::string>{}];
     [menu addSwitchToMenu:s tab:tab];
@@ -653,4 +573,4 @@ static void applyCornerMask(UIView *v, UIRectCorner corners, CGFloat r) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:switchName];
 }
 
-@end  // Switches
+@end
